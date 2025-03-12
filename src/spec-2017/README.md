@@ -1,155 +1,192 @@
 ---
-title: SPEC 2017
-tags:
-    - x86
-    - fullsystem
-layout: default
-permalink: resources/spec-2017
+title: Base Linux x86-ubuntu and arm-ubuntu image with Ubuntu 22.04 or 24.04
 shortdoc: >
-    Resources to build a disk image with the [SPEC 2017 workloads](https://www.spec.org/cpu2017/).
-license: Proprietary SPEC License
+    Resources to build a generic x86-ubuntu or arm-ubuntu disk image and run a "boot-exit" test.
+authors: ["Harshil Patel"]
 ---
 
-This document aims to provide instructions to create a gem5-compatible disk
-image containing the SPEC 2017 benchmark suite. It also demonstrates how to
-simulate the SPEC CPU2017 benchmarks using an example configuration script.
+The disk images are based on Ubuntu and support both x86 and ARM architectures, specifically Ubuntu 22.04 and 24.04. These images have their .bashrc files modified to execute a script passed from the gem5 configuration files (using the m5 readfile instruction). The boot-exit test passes a script that causes the guest OS to terminate the simulation (using the m5 exit instruction) as soon as the system boots.
 
-## Building the Disk Image
-Creating a disk-image for SPEC 2017 requires the benchmark suite ISO file.
-More info about SPEC 2017 can be found at <https://www.spec.org/cpu2017/>.
+## What's on the disk?
 
-In this tutorial, we assume that the file `cpu2017-1.1.0.iso` contains the SPEC
-benchmark suite, and we provide the scripts that are made specifically for
-SPEC 2017 version 1.1.0.
-Throughout the this document, the root folder is `src/spec-2017/`.
-All commands should be run from the assumed root folder.
+- username: gem5
+- password: 12345
 
-The layout of the folder after the scripts are run is as follows,
+- The `gem5-bridge`(m5) utility is installed in `/usr/local/bin/gem5-bridge`.
+- `libm5` is installed in `/usr/local/lib/`.
+- The headers for `libm5` are installed in `/usr/local/include/`.
 
-```
-spec-2017/
-  |___ gem5/                                   # gem5 folder
-  |
-  |___ disk-image/
-  |      |___ build.sh                         # the script downloading packer binary and building the disk image
-  |      |___ shared/
-  |      |___ spec-2017/
-  |             |___ spec-2017-image/
-  |             |      |___ spec-2017          # the disk image will be generated here
-  |             |___ spec-2017.json            # the Packer script
-  |             |___ cpu2017-1.1.0.iso         # SPEC 2017 ISO (add here)
-  |
-  |___ vmlinux-4.19.83                         # Linux kernel, link to download provided below
-  |
-  |___ README.md
+Thus, you should be able to build packages on the disk and easily link to the gem5-bridge library.
 
-```
+The disk has network disabled by default to improve boot time in gem5.
 
-First, to build `m5` (required for interactions between gem5 and the system under simuations):
+If you want to enable networking, you need to modify the disk image and move the file `/etc/netplan/00-installer-config.yaml.bak` or `/etc/netplan/50-cloud-init.yaml.bak` to `/etc/netplan/00-installer-config.yaml` or `/etc/netplan/50-cloud-init.yaml` depending on which config file the disk image contains. The x86 ubuntu 22.04 image should have `/etc/netplan/00-installer-config.yaml` and the other images should have ``/etc/netplan/50-cloud-init.yaml`.
+For example you can use the following commands to re-enable network:
 
 ```sh
-git clone https://gem5.googlesource.com/public/gem5
-cd gem5
-cd util/m5
-scons build/x86/out/m5
+sudo mv /etc/netplan/50-cloud-init.yaml.bak /etc/netplan/50-cloud-init.yaml
+sudo netplan apply
 ```
 
-We use [Packer](https://www.packer.io/), an open-source automated disk image
-creation tool, to build the disk image.
-In the root folder,
+### Installed packages
+
+- `build-essential`
+- `git`
+- `scons`
+- `vim`
+
+## Init Process and Exit Events
+
+This section outlines the disk image's boot process variations and the impact of specific boot parameters on its behavior.
+By default, the disk image boots with systemd in a non-interactive mode.
+Users can adjust this behavior through kernel arguments at boot time, influencing the init system and session interactivity.
+
+### Boot Parameters
+
+The disk image supports two main kernel arguments to adjust the boot process:
+
+- `no_systemd=true`: Disables systemd as the init system, allowing the system to boot without systemd's management.
+- `interactive=true`: Enables interactive mode, presenting a shell prompt to the user for interactive session management.
+
+Combining these parameters yields four possible boot configurations:
+
+1. **Default (Systemd, Non-Interactive)**: The system uses systemd for initialization and runs non-interactively.
+2. **Systemd and Interactive**: Systemd initializes the system, and the boot process enters an interactive mode, providing a user shell.
+3. **Without Systemd and Non-Interactive**: The system boots without systemd and proceeds non-interactively, executing predefined scripts.
+4. **Without Systemd and Interactive**: Boots without systemd and provides a shell for interactive use.
+
+### Note on Print Statements and Exit Events
+
+- The bold points in the sequence descriptions are `printf` statements in the code, indicating key moments in the boot process.
+- The `**` symbols mark gem5 exit events, essential for simulation purposes, dictating system shutdown or reboot actions based on the configured scenario.
+
+### Boot Sequences
+
+#### Default Boot Sequence (Systemd, Non-Interactive)
+
+- Kernel output
+- **Kernel Booted print message** **
+- Running systemd print message
+- Systemd output
+- autologin
+- **Running after_boot script** **
+- Print indicating **non-interactive** mode
+- **Reading run script file**
+- Script output
+- Exit **
+
+#### With Systemd and Interactive
+
+- Kernel output
+- **Kernel Booted print message** **
+- Running systemd print message
+- Systemd output
+- autologin
+- **Running after_boot script** **
+- Shell
+
+#### Without Systemd and Non-Interactive
+
+- Kernel output
+- **Kernel Booted print message** **
+- autologin
+- **Running after_boot script** **
+- Print indicating **non-interactive** mode
+- **Reading run script file**
+- Script output
+- Exit **
+
+#### Without Systemd and Interactive
+
+- Kernel output
+- **Kernel Booted print message** **
+- autologin
+- **Running after_boot script** **
+- Shell
+
+This detailed overview provides a foundational understanding of how different boot configurations affect the system's initialization and mode of operation.
+By selecting the appropriate parameters, users can customize the boot process for diverse environments, ranging from automated setups to hands-on interactive sessions.
+
+## Example Run Scripts
+
+Within the gem5 repository, two example scripts are provided which utilize the x86 ubuntu 24.04 image.
+
+The first is `configs/example/gem5_library/x86-ubuntu-run.py`.
+This will boot the OS with a Timing CPU.
+To run:
 
 ```sh
-cd disk-image
-./build.sh          # the script downloading packer binary and building the disk image
+scons build/X86/gem5.opt -j`nproc`
+./build/ALL/gem5.opt configs/example/gem5_library/x86-ubuntu-run.py
 ```
 
-## Simulating SPEC CPU2017 using an example script
-
-An example script with a pre-configured system is available in the following directory within the gem5 repository:
-
-```
-gem5/configs/example/gem5_library/x86-spec-cpu2017-benchmarks.py
-```
-
-The example script specifies a system with the following parameters:
-
-* A `SimpleSwitchableProcessor` (`KVM` for startup and `TIMING` for ROI execution). There are 2 CPU cores, each clocked at 3 GHz.
-* 2 Level `MESI_Two_Level` cache with 32 kB L1I and L1D size, and, 256 kB L2 size. The L1 cache(s) has associativity of 8, and, the L2 cache has associativity 16. There are 2 L2 cache banks.
-* The system has 3 GB `SingleChannelDDR4_2400` memory.
-* The script uses `x86-linux-kernel-4.19.83` and the disk image created from following the instructions in this `README.md`.
-* The user inputs the path to the built disk image, along with the root partition.
-* The script then uses `CustomResource` class to use the `spec-2017` disk-image.
-
-The example script must be run with the `X86_MESI_Two_Level` binary. To build:
+The second is `configs/example/gem5_library/x86-ubuntu-run-with-kvm.py`.
+This will boot the OS using KVM cores before switching to Timing Cores after systemd is booted.
+To run:
 
 ```sh
-git clone https://gem5.googlesource.com/public/gem5
-cd gem5
-scons build/X86/gem5.opt -j<proc>
+scons build/X86/gem5.opt -j`nproc`
+./build/ALL/gem5.opt configs/example/gem5_library/x86-ubuntu-run-with-kvm.py
 ```
-Once compiled, you may use the example configuration file to run the SPEC CPU2017 benchmark programs using the following command:
+
+To use your local disk image you can use the `DiskImageResource` class from `resources.py` in gem5.
+Following is an example of how to use your local disk image in gem5:
+
+```python
+disk_img = DiskImageResource("/path/to/disk/image/directory/x86-disk-image-24-04/x86-ubuntu")
+board.set_kernel_disk_workload(
+        disk_image=disk_img,
+        kernel=obtain_resource("x86-linux-kernel-5.4.0-105-generic"),
+        kernel_args=[
+            "earlyprintk=ttyS0",
+            "console=ttyS0",
+            "lpj=7999923",
+            "root=/dev/sda2"
+        ]
+    )
+```
+
+**Note:** the `x86-ubuntu-with-kvm.py` script requires a x86 host machine with KVM to function correctly.
+
+The gem5 respository also has two example scripts that utilize the arm ubuntu 24.04 image.
+
+The first is `configs/example/gem5_library/arm-ubuntu-run.py`.
+This will boot the OS with a Timing CPU
+To run:
 
 ```sh
-# In the gem5 directory
-build/X86/gem5.opt \
-configs/example/gem5_library/x86-spec-cpu2017-benchmarks.py \
---image <path_to_built_spec-2017_disk_image> \
---partition <root_partition_to_mount> \
---benchmark <benchmark_program> \
---size <workload_size>
+scons build/ARM/gem5.opt -j `nproc`
+./build/ALL/gem5.opt configs/example/gem5_library/arm-ubuntu-run.py
 ```
 
-Description of the four arguments, provided in the above command are:
-* **--image** refers to the full path of the the SPEC CPU2017 disk-image, built using the instructions specified above.
-* **--partition** refers to the root partition of the disk-image to mount. If the disk has no partitions, then pass `--partition ""`. Otherwise, pass an integer specifying the partition number. Set `--partition 1` if the above instructions to build the disk-image are followed.
-* **--benchmark**, which refers to one of 47 benchmark programs, provided in the SPEC CPU2017 Benchmark Suite. For more information on the workloads can be found at <https://www.spec.org/cpu2017/>. The list of benchmark programs include:
-  * 500.perlbench_r
-  * 502.gcc_r
-  * 503.bwaves_r
-  * 505.mcf_r
-  * 507.cactuBSSN_r
-  * 508.namd_r
-  * 510.parest_r
-  * 511.povray_r
-  * 519.lbm_r
-  * 520.omnetpp_r
-  * 521.wrf_r
-  * 523.xalancbmk_r
-  * 525.x264_r
-  * 526.blender_r
-  * 527.cam4_r
-  * 531.deepsjeng_r
-  * 538.imagick_r
-  * 541.leela_r
-  * 544.nab_r
-  * 548.exchange2_r
-  * 549.fotonik3d_r
-  * 554.roms_r
-  * 557.xz_r
-  * 600.perlbench_s
-  * 602.gcc_s
-  * 603.bwaves_s
-  * 605.mcf_s
-  * 607.cactuBSSN_s
-  * 619.lbm_s
-  * 620.omnetpp_s
-  * 621.wrf_s
-  * 623.xalancbmk_s
-  * 625.x264_s
-  * 627.cam4_s
-  * 628.pop2_s
-  * 631.deepsjeng_s
-  * 638.imagick_s
-  * 641.leela_s
-  * 644.nab_s
-  * 648.exchange2_s
-  * 649.fotonik3d_s
-  * 654.roms_s
-  * 657.xz_s
-  * 996.specrand_fs
-  * 997.specrand_fr
-  * 998.specrand_is
-  * 999.specrand_ir
-* **--size**, which refers to the workload size to simulate. Valid choices for `--size` are `test`, `train` and `ref`.
+The second is `configs/example/gem5_library/arm-ubuntu-run-with-kvm.py`.
+This will boot the OS using KVM cores before switching to Timing Cores after systemd is booted.
+To run:
 
-The output directory, where the simulation statistics will be redirected to, will have a new folder named `speclogs_<Day><Month><Date><Hour><Minute><Second>`. The time is of execution is appended to avoid conflicts while coping the files. The output files, generated on the disk-image in the folder `speclogs` will be copied to this aforementioned directory.
+```sh
+scons build/ARM/gem5.opt -j `nproc`
+./build/ALL/gem5.opt configs/example/gem5_library/arm-ubuntu-run-with-kvm.py
+```
+
+To use your local disk image you can use the `DiskImageResource` class from `resources.py` in gem5.
+Following is an example of how to use your local disk image in gem5:
+
+```python
+disk_img = DiskImageResource("/path/to/disk/image/directory/arm-disk-image-22-04/arm-ubuntu", root_partition="2")
+board.set_kernel_disk_workload(
+        disk_image=disk_img,
+        bootloader=obtain_resource("arm64-bootloader-foundation"),
+        kernel=obtain_resource("arm64-linux-kernel-5.15.36")
+    )
+```
+
+**Note:** the `arm-ubuntu-run-with-kvm.py` script requires an Arm host machine with KVM to function correctly.
+
+## Building and modifying the disk image
+
+See [BUILDING.md](BUILDING.md) for instructions on how to build the disk image.
+
+See [using-local-resources](https://www.gem5.org/documentation/gem5-stdlib/using-local-resources) for instructions on how to use customized resources in gem5 experiments.
+
+To boot in qemu, make sure to specify `/sbin/init.old` as the `init=` option on the kernel command line.
+Otherwise, you will execute the gem5 magic instructions which will cause illegal instructions or segmentation faults.
