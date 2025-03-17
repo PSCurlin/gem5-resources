@@ -9,7 +9,7 @@ packer {
 
 variable "image_name" {
   type    = string
-  default = "x86-spec-2017"
+  default = "x86-spec2017"
 }
 
 variable "ssh_password" {
@@ -55,7 +55,7 @@ source "qemu" "initialize" {
                       "<f10><wait>"
                     ]
   cpus             = "8"
-  disk_size        = "20G"
+  disk_size        = "30G"
   format           = "raw"
   headless         = "true"
   http_directory   = "http/x86"

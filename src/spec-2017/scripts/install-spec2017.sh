@@ -68,6 +68,12 @@ sed -i "s/command_add_redirect = 1/sysinfo_program =\ncommand_add_redirect = 1/g
 # build_ncpus: number of cpus to build the workloads
 # gcc_dir: where to find the compilers (gcc, g++, gfortran)
 runcpu --config=myconfig.${ISA}.cfg --define build_ncpus=$(nproc) --define gcc_dir="/usr" --action=build all
+runcpu --config=myconfig.${ISA}.cfg --define build_ncpus=$(nproc) --define gcc_dir="/usr" --action=setup all
+
+# add permissions to avoid permission denied error for "/result/lock.CPU2017"
+chmod 777 /home/gem5/spec2017/result
+# add permission to avoid permission denied error for writing outputs
+chmod -R 777 /home/gem5/spec2017/benchspec/CPU/*
 
 # the above building process will produce a large log file
 # this command removes the log files to avoid copying out large files unnecessarily

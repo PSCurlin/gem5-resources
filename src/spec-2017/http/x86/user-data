@@ -59,7 +59,7 @@ autoinstall:
       type: partition
       id: partition-0
     - device: disk-vda
-      size: 16106127360
+      size: 26843545600
       wipe: superblock
       number: 2
       preserve: false
