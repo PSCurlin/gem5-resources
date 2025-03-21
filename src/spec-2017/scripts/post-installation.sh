@@ -14,7 +14,6 @@ apt-get install -y scons
 apt-get install -y git
 apt-get install -y vim
 apt-get install -y build-essential
-apt-get install -y zip
 
 echo "Installing serial service for autologin after systemd"
 mv /home/gem5/serial-getty@.service /lib/systemd/system/
