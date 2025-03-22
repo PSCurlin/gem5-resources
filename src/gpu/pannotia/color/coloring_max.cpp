@@ -350,7 +350,7 @@ int main(int argc, char **argv)
     int *color_d;
     int *node_value_d;
     int *stop_d;
-    
+
     // Create device-side buffers for the graph
     err = hipMalloc(&row_d, num_nodes * sizeof(int));
     if (err != hipSuccess) {
