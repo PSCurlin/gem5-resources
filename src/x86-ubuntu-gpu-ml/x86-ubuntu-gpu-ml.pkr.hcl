@@ -26,6 +26,11 @@ variable "ssh_username" {
   default = "gem5"
 }
 
+variable "qemu_path" {
+  type    = string
+  default = "/usr/bin/qemu-system-x86_64"
+}
+
 source "qemu" "initialize" {
   accelerator      = "kvm"
   boot_command     = ["e<wait>",
@@ -43,7 +48,7 @@ source "qemu" "initialize" {
   iso_urls         = ["https://releases.ubuntu.com/24.04.2/ubuntu-24.04.2-live-server-amd64.iso"]
   memory           = "8192"
   output_directory = "disk-image"
-  qemu_binary      = "/usr/bin/qemu-system-x86_64"
+  qemu_binary      = "${var.qemu_path}"
   qemuargs         = [["-cpu", "host"], ["-display", "none"]]
   shutdown_command = "echo '${var.ssh_password}'|sudo -S shutdown -P now"
   ssh_password     = "${var.ssh_password}"
@@ -97,8 +102,13 @@ build {
   }
 
   provisioner "file" {
-    destination = "/usr/lib/firmware/amdgpu/ip_discovery.bin"
+    destination = "/usr/lib/firmware/amdgpu/mi300_discovery"
     source      = "files/mi300_discovery"
+  }
+
+  provisioner "file" {
+    destination = "/usr/lib/firmware/amdgpu/mi350_discovery"
+    source      = "files/mi350_discovery"
   }
 
   provisioner "file" {
