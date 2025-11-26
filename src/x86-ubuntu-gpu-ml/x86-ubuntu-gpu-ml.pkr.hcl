@@ -13,7 +13,7 @@ packer {
 
 variable "image_name" {
   type    = string
-  default = "x86-ubuntu-gpu-ml"
+  default = "x86-ubuntu-rocm70"
 }
 
 variable "ssh_password" {
@@ -113,7 +113,7 @@ build {
 
   provisioner "file" {
     source      = "/home/gem5/vmlinux-gpu-ml"
-    destination = "vmlinux-gpu-ml"
+    destination = "vmlinux-rocm70"
     direction   = "download"
   }
 }
