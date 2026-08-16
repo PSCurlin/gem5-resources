@@ -35,6 +35,13 @@ case "$ISA" in
 esac
 cp "config/$CONFIG" "config/myconfig.${ISA}.cfg"
 
+# Some fixes are needed in the configuration script
+if [ "${ISA}" = "arm64" ]; then
+  sed -i \
+    's/^#%define GCCge10/%define GCCge10/' \
+    config/myconfig.arm64.cfg
+fi
+
 # Install rate benchmarks
 runcpu --config=myconfig.${ISA}.cfg --define build_ncpus=$(nproc) --define gcc_dir=/usr --action=build intrate --tuning=base
 runcpu --config=myconfig.${ISA}.cfg --define build_ncpus=$(nproc) --define gcc_dir=/usr --action=runsetup intrate --tuning=base
@@ -49,11 +56,6 @@ runcpu --config=myconfig.${ISA}.cfg --define build_ncpus=$(nproc) --define gcc_d
 
 # Add permissions to avoid permission denied error for "/result/lock.CPU2026"
 chmod -R 777 /home/gem5/spec2017/*  
-
-while true; do
-    echo "Running..."
-    sleep 1
-done
 
 # the above building process will produce a large log file
 # this command removes the log files to avoid copying out large files unnecessarily
